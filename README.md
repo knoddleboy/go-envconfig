@@ -36,7 +36,7 @@ import (
   "context"
   "log"
 
-  "github.com/sethvargo/go-envconfig"
+  "github.com/knoddleboy/go-envconfig"
 )
 
 func main() {

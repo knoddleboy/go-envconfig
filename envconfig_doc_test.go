@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sethvargo/go-envconfig"
+	"github.com/knoddleboy/go-envconfig"
 )
 
 var ctx = context.Background()
