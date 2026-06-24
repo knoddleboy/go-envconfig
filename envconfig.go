@@ -20,10 +20,11 @@
 //	type MyStruct struct {
 //	  A string `env:"A"` // resolves A to $A
 //	  B string `env:"B,required"` // resolves B to $B, errors if $B is unset
-//	  C string `env:"C,default=foo"` // resolves C to $C, defaults to "foo"
+//	  C string `env:"C,notempty"` // resolves C to $C, errors if $C is unset or empty ("")
+//	  D string `env:"D,default=foo"` // resolves D to $D, defaults to "foo"
 //
-//	  D string `env:"D,required,default=foo"` // error, cannot be required and default
-//	  E string `env:""` // error, must specify key
+//	  E string `env:"E,required,default=foo"` // error, cannot be required and default
+//	  F string `env:""` // error, must specify key
 //	}
 //
 // All built-in types are supported except Func and Chan. If you need to define
@@ -75,6 +76,7 @@ const (
 	optPrefix      = "prefix="
 	optRequired    = "required"
 	optSeparator   = "separator="
+	optNotEmpty    = "notempty"
 )
 
 // internalError is a custom error type for errors returned by envconfig.
@@ -91,6 +93,7 @@ const (
 	ErrLookuperNil        = internalError("lookuper cannot be nil")
 	ErrMissingKey         = internalError("missing key")
 	ErrMissingRequired    = internalError("missing required value")
+	ErrNotEmpty           = internalError("value cannot be empty")
 	ErrNoInitNotPtr       = internalError("field must be a pointer to have noinit")
 	ErrNotPtr             = internalError("input must be a pointer")
 	ErrNotStruct          = internalError("input must be a struct")
@@ -243,6 +246,7 @@ type options struct {
 	Overwrite   bool
 	DecodeUnset bool
 	Required    bool
+	NotEmpty    bool
 }
 
 // Config represent inputs to the envconfig decoding.
@@ -427,6 +431,7 @@ func processWith(ctx context.Context, c *Config) error {
 		overwrite := structOverwrite || opts.Overwrite
 		decodeUnset := structDecodeUnset || opts.DecodeUnset
 		required := structRequired || opts.Required
+		notEmpty := opts.NotEmpty
 
 		isNilStructPtr := false
 		setNilStruct := func(v reflect.Value) {
@@ -532,6 +537,11 @@ func processWith(ctx context.Context, c *Config) error {
 			return fmt.Errorf("%s: %w", tf.Name, err)
 		}
 
+		// Reject empty string when the var was explicitly found
+		if found && val == "" && notEmpty {
+			return fmt.Errorf("%s: %w", tf.Name, ErrNotEmpty)
+		}
+
 		// If the field already has a non-zero value and there was no value directly
 		// specified, do not overwrite the existing field. We only want to overwrite
 		// when the envvar was provided directly.
@@ -609,6 +619,8 @@ LOOP:
 			opts.Overwrite = true
 		case search == optRequired:
 			opts.Required = true
+		case search == optNotEmpty:
+			opts.NotEmpty = true
 		case search == optNoInit:
 			opts.NoInit = true
 		case strings.HasPrefix(search, optPrefix):

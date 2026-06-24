@@ -1174,6 +1174,100 @@ func TestProcessWith(t *testing.T) {
 			err:      ErrRequiredAndDefault,
 		},
 
+		// Not empty
+		{
+			name: "notempty/present",
+			target: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "notempty/present_space",
+			target: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "foo",
+			}),
+		},
+		{
+			name: "notempty/missing",
+			target: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "notempty/missing_space",
+			target: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "notempty/empty",
+			target: &struct {
+				Field string `env:"FIELD,notempty"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			err: ErrNotEmpty,
+		},
+		{
+			name: "notempty/empty_space",
+			target: &struct {
+				Field string `env:"FIELD, notempty"`
+			}{},
+			lookuper: MapLookuper(map[string]string{
+				"FIELD": "",
+			}),
+			err: ErrNotEmpty,
+		},
+		{
+			name: "notempty/default",
+			target: &struct {
+				Field string `env:"FIELD,notempty,default=foo"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD,notempty,default=foo"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(nil),
+		},
+		{
+			name: "notempty/default_space",
+			target: &struct {
+				Field string `env:"FIELD, notempty, default=foo"`
+			}{},
+			exp: &struct {
+				Field string `env:"FIELD, notempty, default=foo"`
+			}{
+				Field: "foo",
+			},
+			lookuper: MapLookuper(nil),
+		},
+
 		// Default
 		{
 			name: "default/missing",

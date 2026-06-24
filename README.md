@@ -1,3 +1,5 @@
+The purpose of this fork is to add support for a `notempty` tag that validates environment variables that are set but empty. This feature was previously discussed in [this PR](https://github.com/sethvargo/go-envconfig/pull/44). However, due to differing opinions, it is unlikely to be implemented in the upstream project.
+
 # Envconfig
 
 [![GoDoc](https://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)][godoc]
@@ -69,141 +71,137 @@ type DatabaseConfig struct {
 Use the `env` struct tag to define configuration. See the [godoc][] for usage
 examples.
 
--   `required` - marks a field as required. If a field is required, decoding
-    will error if the environment variable is unset.
+- `required` - marks a field as required. If a field is required, decoding
+  will error if the environment variable is unset.
 
-    ```go
-    type MyStruct struct {
-      Port string `env:"PORT, required"`
-    }
-    ```
+  ```go
+  type MyStruct struct {
+    Port string `env:"PORT, required"`
+  }
+  ```
 
--   `default` - sets the default value for the environment variable is not set.
-    The environment variable must not be set (e.g. `unset PORT`). If the
-    environment variable is the empty string, envconfig considers that a "value"
-    and the default will **not** be used.
+- `default` - sets the default value for the environment variable is not set.
+  The environment variable must not be set (e.g. `unset PORT`). If the
+  environment variable is the empty string, envconfig considers that a "value"
+  and the default will **not** be used.
 
-    You can also set the default value to the value from another field or a
-    value from a different environment variable.
+  You can also set the default value to the value from another field or a
+  value from a different environment variable.
 
-    ```go
-    type MyStruct struct {
-      Port string `env:"PORT, default=5555"`
-      User string `env:"USER, default=$CURRENT_USER"`
-    }
-    ```
+  ```go
+  type MyStruct struct {
+    Port string `env:"PORT, default=5555"`
+    User string `env:"USER, default=$CURRENT_USER"`
+  }
+  ```
 
-    As a special case where the default value should contain a literal `$`,
-    escape it with a backslash. Unfortunately this requires a double backslash
-    in the struct tag:
+  As a special case where the default value should contain a literal `$`,
+  escape it with a backslash. Unfortunately this requires a double backslash
+  in the struct tag:
 
-    ```go
-    type MyStruct struct {
-      Amount string `env:"AMOUNT, default=\\$5.00"` // Default: $5.00
-    }
-    ```
+  ```go
+  type MyStruct struct {
+    Amount string `env:"AMOUNT, default=\\$5.00"` // Default: $5.00
+  }
+  ```
 
-    To have a literal backslash followed by a `$`, escape the backslash:
+  To have a literal backslash followed by a `$`, escape the backslash:
 
-    ```go
-    type MyStruct struct {
-      Filepath string `env:"FILEPATH, default=C:\\Personal\\\\$name"` // Default: C:\Personal\$name
-    }
-    ```
+  ```go
+  type MyStruct struct {
+    Filepath string `env:"FILEPATH, default=C:\\Personal\\\\$name"` // Default: C:\Personal\$name
+  }
+  ```
 
--   `prefix` - sets the prefix to use for looking up environment variable keys
-    on child structs and fields. This is useful for shared configurations:
+- `prefix` - sets the prefix to use for looking up environment variable keys
+  on child structs and fields. This is useful for shared configurations:
 
-    ```go
-    type RedisConfig struct {
-      Host string `env:"REDIS_HOST"`
-      User string `env:"REDIS_USER"`
-    }
+  ```go
+  type RedisConfig struct {
+    Host string `env:"REDIS_HOST"`
+    User string `env:"REDIS_USER"`
+  }
 
-    type ServerConfig struct {
-      // CacheConfig will process values from $CACHE_REDIS_HOST and
-      // $CACHE_REDIS_USER respectively.
-      CacheConfig *RedisConfig `env:", prefix=CACHE_"`
+  type ServerConfig struct {
+    // CacheConfig will process values from $CACHE_REDIS_HOST and
+    // $CACHE_REDIS_USER respectively.
+    CacheConfig *RedisConfig `env:", prefix=CACHE_"`
 
-      // RateLimitConfig will process values from $RATE_LIMIT_REDIS_HOST and
-      // $RATE_LIMIT_REDIS_USER respectively.
-      RateLimitConfig *RedisConfig `env:", prefix=RATE_LIMIT_"`
-    }
-    ```
+    // RateLimitConfig will process values from $RATE_LIMIT_REDIS_HOST and
+    // $RATE_LIMIT_REDIS_USER respectively.
+    RateLimitConfig *RedisConfig `env:", prefix=RATE_LIMIT_"`
+  }
+  ```
 
--   `overwrite` - force overwriting existing non-zero struct values if the
-    environment variable was provided.
+- `overwrite` - force overwriting existing non-zero struct values if the
+  environment variable was provided.
 
-    ```go
-    type MyStruct struct {
-      Port string `env:"PORT, overwrite"`
-    }
-    ```
+  ```go
+  type MyStruct struct {
+    Port string `env:"PORT, overwrite"`
+  }
+  ```
 
-    The rules for overwrite + default are:
+  The rules for overwrite + default are:
+  - If the struct field has the zero value and a default is set:
+    - If no environment variable is specified, the struct field will be
+      populated with the default value.
 
-    -   If the struct field has the zero value and a default is set:
+    - If an environment variable is specified, the struct field will be
+      populate with the environment variable value.
 
-        -   If no environment variable is specified, the struct field will be
-            populated with the default value.
+  - If the struct field has a non-zero value and a default is set:
+    - If no environment variable is specified, the struct field's existing
+      value will be used (the default is ignored).
 
-        -   If an environment variable is specified, the struct field will be
-            populate with the environment variable value.
+    - If an environment variable is specified, the struct field's existing
+      value will be overwritten with the environment variable value.
 
-    -   If the struct field has a non-zero value and a default is set:
+- `delimiter` - choose a custom character to denote individual slice and map
+  entries. The default value is the comma (`,`).
 
-        -   If no environment variable is specified, the struct field's existing
-            value will be used (the default is ignored).
+  ```go
+  type MyStruct struct {
+    MyVar []string `env:"MYVAR, delimiter=;"`
+  ```
 
-        -   If an environment variable is specified, the struct field's existing
-            value will be overwritten with the environment variable value.
+  ```bash
+  export MYVAR="a;b;c;d" # []string{"a", "b", "c", "d"}
+  ```
 
--   `delimiter` - choose a custom character to denote individual slice and map
-    entries. The default value is the comma (`,`).
+- `separator` - choose a custom character to denote the separation between
+  keys and values in map entries. The default value is the colon (`:`) Define
+  a separator with `separator`:
 
-    ```go
-    type MyStruct struct {
-      MyVar []string `env:"MYVAR, delimiter=;"`
-    ```
+  ```go
+  type MyStruct struct {
+    MyVar map[string]string `env:"MYVAR, separator=|"`
+  }
+  ```
 
-    ```bash
-    export MYVAR="a;b;c;d" # []string{"a", "b", "c", "d"}
-    ```
+  ```bash
+  export MYVAR="a|b,c|d" # map[string]string{"a":"b", "c":"d"}
+  ```
 
--   `separator` - choose a custom character to denote the separation between
-    keys and values in map entries. The default value is the colon (`:`) Define
-    a separator with `separator`:
+- `noinit` - do not initialize struct fields unless environment variables were
+  provided. The default behavior is to deeply initialize all fields to their
+  default (zero) value.
 
-    ```go
-    type MyStruct struct {
-      MyVar map[string]string `env:"MYVAR, separator=|"`
-    }
-    ```
+  ```go
+  type MyStruct struct {
+    MyVar *url.URL `env:"MYVAR, noinit"`
+  }
+  ```
 
-    ```bash
-    export MYVAR="a|b,c|d" # map[string]string{"a":"b", "c":"d"}
-    ```
+- `decodeunset` - force envconfig to run decoders even on unset environment
+  variable values. The default behavior is to skip running decoders on unset
+  environment variable values.
 
--   `noinit` - do not initialize struct fields unless environment variables were
-    provided. The default behavior is to deeply initialize all fields to their
-    default (zero) value.
-
-    ```go
-    type MyStruct struct {
-      MyVar *url.URL `env:"MYVAR, noinit"`
-    }
-    ```
-
--   `decodeunset` - force envconfig to run decoders even on unset environment
-    variable values. The default behavior is to skip running decoders on unset
-    environment variable values.
-
-    ```go
-    type MyStruct struct {
-      MyVar *url.URL `env:"MYVAR, decodeunset"`
-    }
-    ```
-
+  ```go
+  type MyStruct struct {
+    MyVar *url.URL `env:"MYVAR, decodeunset"`
+  }
+  ```
 
 ## Decoding
 
@@ -211,7 +209,6 @@ examples.
 >
 > Complex types are only decoded or unmarshalled when the environment variable
 > is defined or a default value is specified.
-
 
 ### Durations
 
@@ -228,22 +225,18 @@ type MyStruct struct {
 export MYVAR="10m" # 10 * time.Minute
 ```
 
-
 ### TextUnmarshaler / BinaryUnmarshaler
 
 Types that implement `TextUnmarshaler` or `BinaryUnmarshaler` are processed as
 such.
 
-
 ### json.Unmarshaler
 
 Types that implement `json.Unmarshaler` are processed as such.
 
-
 ### gob.Decoder
 
 Types that implement `gob.Decoder` are processed as such.
-
 
 ### Slices
 
@@ -262,7 +255,6 @@ export MYVAR="a,b,c,d" # []string{"a", "b", "c", "d"}
 Note that byte slices are special cased and interpreted as strings from the
 environment.
 
-
 ### Maps
 
 Maps are specified as comma-separated key:value pairs:
@@ -277,7 +269,6 @@ type MyStruct struct {
 export MYVAR="a:b,c:d" # map[string]string{"a":"b", "c":"d"}
 ```
 
-
 ### Structs
 
 Envconfig walks the entire struct, including nested structs, so deeply-nested
@@ -286,7 +277,6 @@ fields are also supported.
 If a nested struct is a pointer type, it will automatically be instantianted to
 the non-nil value. To change this behavior, see
 [Initialization](#Initialization).
-
 
 ### Custom Decoders
 
@@ -305,7 +295,6 @@ func (t *MyCustomType) EnvDecode(ctx context.Context, val string) error {
 ```
 
 See the [godoc][godoc] for more information.
-
 
 ## Testing
 
@@ -332,6 +321,5 @@ example.
 
 You can also combine multiple lookupers with `MultiLookuper`. See the GoDoc for
 more information and examples.
-
 
 [godoc]: https://pkg.go.dev/mod/github.com/sethvargo/go-envconfig
